@@ -8,53 +8,90 @@ app.use(bodyParser.json());
 const port = 8000;
 
 let conn = null;
-const initMySQL = async() => {
+const initMySQL = async () => {
     conn = await mysql.createConnection({
         host: 'localhost',
         user: 'root',
         password: 'root',
         database: 'webdb',
         port: 8700
-    }); 
+    });
     console.log('connected to MySQL database');
 }
 
 
-app.get('/users',async (req,res)=> {
+app.get('/users', async (req, res) => {
     const results = await conn.query('SELECT * FROM users');
     res.json(results[0]);
 
 })
+const validateData = (userData) => {
+    let errors = [];
+    if (!userData.firstName) {
+        errors.push('กรุณากรอกชื่อ');
+    }
+    if (!userData.lastName) {
+        errors.push('กรุณากรอกนามสกุล');
+    }
+    if (!userData.age) {
+        errors.push('กรุณากรอกอายุ');
+    }
+    if (!userData.gender) {
+        errors.push('กรุณาเลือกเพศ');
+    }
+    if (!userData.interests) {
+        errors.push('กรุณาเลือกงานอดิเรก');
+    }
+    if (!userData.description) {
+        errors.push('กรุณากรอกคำอธิบาย');
+    }
+    return errors;
+}
 
 
-app.post('/users',async (req,res) => {
-    try{
+
+app.post('/users', async (req, res) => {
+    try {
         let user = req.body;
-        const results = await conn.query('Insert into users set ? ',user);
-        res.json({
-        massage: 'User added successfully',
-        data: results[0]
-    });
+        const errors = validateData(user);
+        if (errors.length > 0) {
+            throw{
+            message: 'กรุณากรอกข้อมูลให้ครบถ้วน',
+            errors: errors
+            }
+        }
 
-    }catch(error){
-        console.log('Error inserting user:',error);
-        res.status(500).json({message:'Error adding user'});
+        const results = await conn.query('Insert into users set ? ', user);
+        res.json({
+            massage: 'User added successfully',
+            data: results[0]
+        });
+
+    } catch (error) {
+        const errorMessage = error.message || 'Error adding user'
+        const errors = error.errors || [];
+        console.error('Error inserting user:', error);
+        res.status(500).json({
+            message: errorMessage,
+            errors: errors
+        });
+
     }
 })
 //API GET
-app.get('/users/:id',async (req,res) => {
-    try{
+app.get('/users/:id', async (req, res) => {
+    try {
         let id = req.params.id;
-        const results = await conn.query('SELECT * FROM users WHERE id = ?',id );
-        if (results[0].lenght === 0){
-            throw {statusCode: 404,message:'User not found'};
+        const results = await conn.query('SELECT * FROM users WHERE id = ?', id);
+        if (results[0].length === 0) {
+            throw { statusCode: 404, message: 'User not found' };
         }
         res.json(results[0][0]);
-    }catch (error){
-        console.error('Error fetching user :',error);
+    } catch (error) {
+        console.error('Error fetching user :', error);
         let statusCode = error.statusCode || 500;
         res.status(500).json({
-            message:error.message||'Error fetching user'
+            message: error.message || 'Error fetching user'
         });
     }
 })
@@ -63,11 +100,11 @@ app.put('/users/:id', async (req, res) => {
     try {
         let id = req.params.id;
         // 1. แก้ req.bodyu เป็น req.body และใช้ชื่อตัวแปร updateUser ให้ตรงกัน
-        let updateUser = req.body; 
+        let updateUser = req.body;
 
         // 2. เรียกใช้ตัวแปร updateUser ให้ตรงกับที่ประกาศไว้ด้านบน
         const results = await conn.query('UPDATE users SET ? WHERE id = ?', [updateUser, id]);
-        
+
         res.json({
             message: 'User updated successfully',
             data: results[0]
@@ -93,7 +130,7 @@ app.delete('/users/:id', async (req, res) => {
         res.status(500).json({ message: 'Error deleting user' });
     }
 });
-app.listen(port,async () => {
+app.listen(port, async () => {
     await initMySQL();
     console.log(`Server is running on http://localhost:${port}`);
 });
